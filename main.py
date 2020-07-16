@@ -87,7 +87,7 @@ create_accounting_vs_tax_value_differences = """
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     FSA TEXT NOT NULL,
     ACC_VAL INTEGER,
-    TAX VAL INTEGER,
+    TAX_VAL INTEGER,
     TAX_vs_ACC INTEGER,
     DATE_LAST_UPDATED TEXT,
     LAST_UPDATED_BY TEXT    
@@ -168,7 +168,7 @@ def read_Provision_Mapping_Tool(connection):
     #Inserting table_1 into the Tax_NetIncome database table
     len_table = int(len(table_1))
     curr_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    curr_user = homedir = os.environ['HOME'].split("\\")[-1]   
+    curr_user = os.environ['USERNAME'] 
     cursor = connection.cursor()
     
     for i in range(0, len_table, 2):
@@ -225,8 +225,9 @@ def read_Provision_Mapping_Tool(connection):
 
     table_2.append("Tax Net Income")
     table_2.append(f"{Tax_Net_Income}")
-
-    #Defining range for , accessing value and appending to table_1
+    table_2.append(f"{Tax_Net_Income}")
+    table_2.append(f"{Tax_Net_Income}")
+    
 
     #Defining xlconstants
     xlRight = win32.constants.xlToRight
@@ -242,26 +243,29 @@ def read_Provision_Mapping_Tool(connection):
 
     raw_data = sheet2.Range(First_cell, Last_cell).Value
 
-    for i in range(len(raw_data) - 1):
+    for i in range(len(raw_data)):
         #Appending FSA
         table_2.append(raw_data[i][0])
 
-        #Appending Value
-        table_2.append(raw_data[i][2]) 
+        #Appending Acc Value and Tax Value and its difference    
+        table_2.append(raw_data[i][1])
+        table_2.append(raw_data[i][2])
+        table_2.append(raw_data[i][2] - raw_data[i][1])
+        
 
     #Inserting table_2 into the Accounting_vs_Tax_diff database table
-    len_table_2_half = int(len(table_2)/3) - 1   
+    len_table_2 = int(len(table_2))   
     cursor = connection.cursor()
     
-    for i in range(0, len_table_1_half, 3):
+    for i in range(0, len_table_2, 4):
         
         FSA = table_2[i]
         ACC_VAL = table_2[i+1]
         TAX_VAL = table_2[i+2]
-        TAX_vs_ACC = TAX_VAL - ACC_VAL
-        Tax_Net_Income += TAX_vs_ACC        
+        TAX_vs_ACC = table_2[i+3]
+        #Tax_Net_Income += TAX_vs_ACC        
         cursor.execute("INSERT INTO Accounting_vs_Tax_diff (FSA, ACC_VAL, TAX_VAL, TAX_vs_ACC, DATE_LAST_UPDATED, LAST_UPDATED_BY) VALUES(?, ?, ?, ?, ?, ?)",
-                   (FSA, (ACC_VAL), (TAX_VAL), (TAX_vs_ACC), DATE_LAST_UPDATED, LAST_UPDATED_BY))
+                   (FSA, int(ACC_VAL), int(TAX_VAL), int(TAX_vs_ACC), curr_time, curr_user))
         connection.commit()
 
     #The following is updating the Tax_Provision_Workbook for the table_1 data (i.e. reconciliation between accounting and tax net income)
@@ -272,14 +276,14 @@ def read_Provision_Mapping_Tool(connection):
             Main_Sheet = wb.ActiveSheet        
 
             #Get # of rows and columns
-            Row_Len = len(table_1[0])
+            Row_Len = len(table_2)/4
             
-            Col_Len = len(table_1)
+            Col_Len = 4
             
 
             #Defining the first and last cells in our range
             First_Cell = Main_Sheet.Cells(2,8)
-            Last_Cell = Main_Sheet.Cells(2+Col_Len, 7+Row_Len) 
+            Last_Cell = Main_Sheet.Cells(1+Row_Len, 7+Col_Len) 
 
             #Defining the range
             main_sheet_Range = Main_Sheet.Range(First_Cell, Last_Cell)
@@ -287,10 +291,12 @@ def read_Provision_Mapping_Tool(connection):
             #Populate the excel sheet starting with cells (2,8)
             table = []
 
-            for i in range(0, len(table_1), 2):
+            for i in range(0, len(table_2), 4):
                 table_new = []
                 table_new.append(table_1[i])
                 table_new.append(table_1[i+1])
+                table_new.append(table_1[i+2])
+                table_new.append(table_1[i+3])
                 table.append(table_new)
                 
             main_sheet_Range.Value = table
