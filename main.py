@@ -104,9 +104,9 @@ def read_Provision_Mapping_Tool(connection):
 
     # Accessing sheet 1 here to get information from workbook to be able to compute net income for tax purposes
 
-    sheet_1 = workbook.Sheets(1)
+    sheet1 = workbook.Sheets(1)
 
-    Acc_NI = int(sheet_1.Range("D3").Value)
+    Acc_NI = int(sheet1.Range("D3").Value)
     Tax_Net_Income = Acc_NI
 
     #Defining Table1 here. This is a list with the values that are going to be entered into the first Table defined above
@@ -127,17 +127,19 @@ def read_Provision_Mapping_Tool(connection):
 
     #Define the first and last cell in our range
     inclusion_First_cell = sheet1.Cells(3, 6)
-    inclusion_Last_cell = sheet1.Cells(inclusion_LastCol, inclusion_LastRow)
+    inclusion_Last_cell = sheet1.Cells(inclusion_LastRow, inclusion_LastCol)
 
     raw_data = sheet1.Range(inclusion_First_cell, inclusion_Last_cell).Value
 
-    for i in range(len(raw_data) - 1):
+    for i in range(len(raw_data)):
         #Appending FSA
         table_1.append(raw_data[i][0])
 
         #Appending Value
-        Tax_Net_Income += raw_data[i][2]
-        table_1.append(raw_data[i][2]) 
+
+        #THE FOLLOWING HAS TO BE UNCOMMENTED - IMPORTANT
+        Tax_Net_Income += int(raw_data[i][3])
+        table_1.append(raw_data[i][3]) 
 
     #Defining range for deductions, accessing value and appending to table_1
     deduction_LastCol = sheet1.Range("K3").End(xlRight).Column  
@@ -145,17 +147,18 @@ def read_Provision_Mapping_Tool(connection):
 
     #Define the first and last cell in our range
     deduction_First_cell = sheet1.Cells(3, 11)
-    deduction_Last_cell = sheet1.Cells(deduction_LastCol, deduction_LastRow)
+    deduction_Last_cell = sheet1.Cells(deduction_LastRow, deduction_LastCol)
 
     raw_data = sheet1.Range(deduction_First_cell, deduction_Last_cell).Value
 
-    for i in range(len(raw_data) - 1):
+    for i in range(len(raw_data)):
         #Appending FSA
         table_1.append(raw_data[i][0])
 
         #Appending Value
-        Tax_Net_Income -= raw_data[i][2]
-        table_1.append(raw_data[i][2])
+        #THE FOLLOWING HAS TO BE UNCOMMENTED - IMPORTANT
+        Tax_Net_Income -= int(raw_data[i][3])
+        table_1.append(raw_data[i][3])
 
     #Appending to table_1 the calculated tax net income
     table_1.append("Tax Net Income")
@@ -163,18 +166,17 @@ def read_Provision_Mapping_Tool(connection):
 
 
     #Inserting table_1 into the Tax_NetIncome database table
-    len_table_1_half = int(len(table_1)/2) - 1 
+    len_table = int(len(table_1))
     curr_time = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     curr_user = homedir = os.environ['HOME'].split("\\")[-1]   
     cursor = connection.cursor()
     
-    
-
-    for i in range(0, len_table_1_half, 2):
+    for i in range(0, len_table, 2):
         
         FSA = table_1[i]
         AMOUNT = table_1[i+1]
-        Tax_Net_Income += AMOUNT
+        #THE FOLLOWING HAS TO BE UNCOMMENTED - IMPORTANT
+        #Tax_Net_Income += AMOUNT
         cursor.execute("INSERT INTO Tax_NetIncome (FSA, AMOUNT, DATE_LAST_UPDATED, LAST_UPDATED_BY) VALUES(?, ?, ?, ?)",
                    (FSA, int(AMOUNT), curr_time, curr_user))
         connection.commit()
@@ -187,26 +189,36 @@ def read_Provision_Mapping_Tool(connection):
             Main_Sheet = wb.ActiveSheet        
 
             #Get # of rows and columns
-            Row_Len = len(table_1[0])
+            Row_Len = len(table_1)/2
             
-            Col_Len = len(table_1)
+            Col_Len = 2
             
 
             #Defining the first and last cells in our range
             First_Cell = Main_Sheet.Cells(2,2)
-            Last_Cell = Main_Sheet.Cells(2+Col_Len, 2+Row_Len) 
+            Last_Cell = Main_Sheet.Cells(1 + Row_Len, 3)
+                                          
 
             #Defining the range
             main_sheet_Range = Main_Sheet.Range(First_Cell, Last_Cell)
 
             #Populate the excel sheet starting with cells (2,2)
-        main_sheet_Range.Value = table_1
+
+            table = []
+
+            for i in range(0, len(table_1), 2):
+                table_new = []
+                table_new.append(table_1[i])
+                table_new.append(table_1[i+1])
+                table.append(table_new)
+                
+            main_sheet_Range.Value = table
         
 
     
     # Accessing sheet 2 here to get information from workbook to be able to compute DTA/DTL
 
-    sheet_2 = workbook.Sheets(2)
+    sheet2 = workbook.Sheets(2)
 
     #Defining Table1 here. This is a list with the values that are going to be entered into the first Table defined above
     table_2 = []
@@ -221,12 +233,12 @@ def read_Provision_Mapping_Tool(connection):
     xlDown = win32.constants.xlDown
 
     #get last row and last columns in our range
-    LastCol = sheet1.Range("A3").End(xlRight).Column  
-    LastRow = sheet1.Range("A3").End(xlDown).Row
+    LastCol = sheet2.Range("A3").End(xlRight).Column  
+    LastRow = sheet2.Range("A3").End(xlDown).Row
 
     #Define the first and last cell in our range
     First_cell = sheet2.Cells(3, 1)
-    Last_cell = sheet2.Cells(LastCol, LastRow)
+    Last_cell = sheet2.Cells(LastRow, LastCol)
 
     raw_data = sheet2.Range(First_cell, Last_cell).Value
 
@@ -249,7 +261,7 @@ def read_Provision_Mapping_Tool(connection):
         TAX_vs_ACC = TAX_VAL - ACC_VAL
         Tax_Net_Income += TAX_vs_ACC        
         cursor.execute("INSERT INTO Accounting_vs_Tax_diff (FSA, ACC_VAL, TAX_VAL, TAX_vs_ACC, DATE_LAST_UPDATED, LAST_UPDATED_BY) VALUES(?, ?, ?, ?, ?, ?)",
-                   (FSA, int(ACC_VAL), int(TAX_VAL), int(TAX_vs_ACC), DATE_LAST_UPDATED, LAST_UPDATED_BY))
+                   (FSA, (ACC_VAL), (TAX_VAL), (TAX_vs_ACC), DATE_LAST_UPDATED, LAST_UPDATED_BY))
         connection.commit()
 
     #The following is updating the Tax_Provision_Workbook for the table_1 data (i.e. reconciliation between accounting and tax net income)
@@ -273,7 +285,17 @@ def read_Provision_Mapping_Tool(connection):
             main_sheet_Range = Main_Sheet.Range(First_Cell, Last_Cell)
 
             #Populate the excel sheet starting with cells (2,8)
-            main_sheet_Range.Value = table_2
+            table = []
+
+            for i in range(0, len(table_1), 2):
+                table_new = []
+                table_new.append(table_1[i])
+                table_new.append(table_1[i+1])
+                table.append(table_new)
+                
+            main_sheet_Range.Value = table
+
+read_Provision_Mapping_Tool(connection)
 
 ###END OF PROGRAM###
 
